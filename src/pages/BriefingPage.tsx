@@ -1,8 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Zap, Calendar, ExternalLink } from "lucide-react";
+import { ArrowLeft, Zap, Calendar, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { sampleBriefing } from "@/lib/mockData";
+import { sampleBriefing, BriefingData } from "@/lib/mockData";
 import ExecutiveSummary from "@/components/briefing/ExecutiveSummary";
 import Timeline from "@/components/briefing/Timeline";
 import KeyEntities from "@/components/briefing/KeyEntities";
@@ -14,7 +15,39 @@ import ChatPanel from "@/components/briefing/ChatPanel";
 const BriefingPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const briefing = sampleBriefing; // In production, fetch by id
+  const [briefing, setBriefing] = useState<BriefingData | null>(null);
+  const [articleText, setArticleText] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (id === "custom") {
+      const stored = sessionStorage.getItem("custom-briefing");
+      const storedText = sessionStorage.getItem("custom-article-text");
+      if (stored) {
+        setBriefing(JSON.parse(stored));
+        setArticleText(storedText || "");
+      } else {
+        navigate("/");
+        return;
+      }
+    } else {
+      // Use sample data for trending stories
+      setBriefing(sampleBriefing);
+      setArticleText("");
+    }
+    setLoading(false);
+  }, [id, navigate]);
+
+  if (loading || !briefing) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-gold animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading briefing...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -69,7 +102,7 @@ const BriefingPage = () => {
             <Timeline events={briefing.timeline} />
             <Perspectives bullish={briefing.bullish} bearish={briefing.bearish} />
             <WatchNext items={briefing.watchNext} />
-            <ChatPanel storyTitle={briefing.title} />
+            <ChatPanel storyTitle={briefing.title} articleContext={articleText} />
           </div>
 
           {/* Sidebar */}
