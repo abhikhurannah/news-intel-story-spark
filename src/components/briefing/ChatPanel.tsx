@@ -3,21 +3,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Send, Bot, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { streamChatQA } from "@/lib/api";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-const mockResponses: Record<string, string> = {
-  default:
-    "Based on the article context, this is an AI-powered follow-up response. In the full version, I would analyze the article content and provide a contextual answer grounded in the source material. Connect Lovable Cloud to enable live AI responses.",
-};
-
-const ChatPanel = ({ storyTitle }: { storyTitle: string }) => {
+const ChatPanel = ({ storyTitle, articleContext = "" }: { storyTitle: string; articleContext?: string }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const { toast } = useToast();
 
   const suggestedQuestions = [
     "What does this mean for retail investors?",
@@ -25,20 +24,43 @@ const ChatPanel = ({ storyTitle }: { storyTitle: string }) => {
     "What are the risks?",
   ];
 
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
+  const handleSend = async (text: string) => {
+    if (!text.trim() || isTyping) return;
     const userMsg: Message = { role: "user", content: text };
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInput("");
     setIsTyping(true);
 
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: mockResponses.default },
-      ]);
+    let assistantSoFar = "";
+    const upsertAssistant = (chunk: string) => {
+      assistantSoFar += chunk;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant") {
+          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
+        }
+        return [...prev, { role: "assistant", content: assistantSoFar }];
+      });
+    };
+
+    try {
+      await streamChatQA({
+        messages: newMessages,
+        articleContext,
+        storyTitle,
+        onDelta: upsertAssistant,
+        onDone: () => setIsTyping(false),
+      });
+    } catch (err: any) {
+      console.error("Chat error:", err);
       setIsTyping(false);
-    }, 1200);
+      toast({
+        title: "Chat error",
+        description: err.message || "Failed to get a response",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -71,7 +93,7 @@ const ChatPanel = ({ storyTitle }: { storyTitle: string }) => {
       )}
 
       {messages.length > 0 && (
-        <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+        <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
           <AnimatePresence>
             {messages.map((msg, i) => (
               <motion.div
@@ -90,7 +112,13 @@ const ChatPanel = ({ storyTitle }: { storyTitle: string }) => {
                       : "bg-secondary text-secondary-foreground"
                   }`}
                 >
-                  {msg.content}
+                  {msg.role === "assistant" ? (
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
                 {msg.role === "user" && (
                   <User className="w-5 h-5 text-muted-foreground shrink-0 mt-1" />
@@ -98,7 +126,7 @@ const ChatPanel = ({ storyTitle }: { storyTitle: string }) => {
               </motion.div>
             ))}
           </AnimatePresence>
-          {isTyping && (
+          {isTyping && messages[messages.length - 1]?.role !== "assistant" && (
             <div className="flex gap-2 items-center">
               <Bot className="w-5 h-5 text-gold" />
               <div className="flex gap-1">
@@ -123,12 +151,13 @@ const ChatPanel = ({ storyTitle }: { storyTitle: string }) => {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a follow-up question..."
           className="bg-secondary border-border text-foreground placeholder:text-muted-foreground focus:border-gold"
+          disabled={isTyping}
         />
         <Button
           type="submit"
           size="icon"
           className="gradient-gold text-primary-foreground shrink-0"
-          disabled={!input.trim()}
+          disabled={!input.trim() || isTyping}
         >
           <Send className="w-4 h-4" />
         </Button>

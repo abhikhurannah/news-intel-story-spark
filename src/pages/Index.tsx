@@ -1,24 +1,49 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, Zap, ArrowRight, Globe } from "lucide-react";
+import { Search, Zap, Globe, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import StoryCard from "@/components/StoryCard";
 import { trendingStories } from "@/lib/mockData";
+import { scrapeArticle, generateBriefing } from "@/lib/api";
 
 const Index = () => {
   const [url, setUrl] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const handleStoryClick = (id: string) => {
     navigate(`/briefing/${id}`);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (url.trim()) {
-      navigate(`/briefing/custom?url=${encodeURIComponent(url)}`);
+    if (!url.trim()) return;
+    setIsAnalyzing(true);
+
+    try {
+      toast({ title: "Scraping article...", description: "Extracting content from the URL" });
+      const article = await scrapeArticle(url);
+
+      toast({ title: "Generating briefing...", description: "AI is analyzing the article" });
+      const briefing = await generateBriefing(article.markdown, article.title, article.source);
+
+      // Store briefing in sessionStorage for the briefing page
+      sessionStorage.setItem("custom-briefing", JSON.stringify(briefing));
+      sessionStorage.setItem("custom-article-text", article.markdown);
+      navigate(`/briefing/custom`);
+    } catch (err: any) {
+      console.error("Analysis error:", err);
+      toast({
+        title: "Analysis failed",
+        description: err.message || "Could not analyze the article. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -72,14 +97,20 @@ const Index = () => {
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="Paste an article URL..."
                 className="pl-10 bg-card border-border h-12 text-foreground placeholder:text-muted-foreground focus:border-gold focus:ring-gold"
+                disabled={isAnalyzing}
               />
             </div>
             <Button
               type="submit"
               className="h-12 px-6 gradient-gold text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+              disabled={isAnalyzing || !url.trim()}
             >
-              <Search className="w-4 h-4 mr-2" />
-              Analyze
+              {isAnalyzing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4 mr-2" />
+              )}
+              {isAnalyzing ? "Analyzing..." : "Analyze"}
             </Button>
           </motion.form>
         </div>
