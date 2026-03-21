@@ -125,7 +125,7 @@ npm run test
 
 ![AI answer in chat panel](public/readme-screenshot-7.png)
 
-### Source Reference Example
+### Timeline for Major Events
 
 ![Sample source article page](public/readme-screenshot-2.png)
 
