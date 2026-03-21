@@ -8,23 +8,19 @@ Turn any news article into a structured, interactive intelligence briefing — c
 
 ## 📸 Screenshots
 
-### Homepage — Paste any article URL
-![Hero](public/screenshots/hero.png)
+| Homepage | Briefing Page |
+|----------|--------------|
+| Paste any article URL and hit Analyze | Executive Summary, Key Numbers, Why It Matters |
 
-### Executive Summary & Key Numbers
-![Briefing](public/screenshots/briefing.png)
+| Timeline | Key Entities |
+|----------|-------------|
+| Chronological event timeline with gold markers | People, companies & organizations with role descriptions |
 
-### Timeline of Events
-![Timeline](public/screenshots/timeline.png)
+| Perspectives | Interactive Q&A |
+|-------------|----------------|
+| Bullish vs Bearish analysis + What to Watch Next | Ask follow-up questions with streaming AI responses |
 
-### Key Entities
-![Entities](public/screenshots/entities.png)
-
-### Perspectives — Bullish vs Bearish & What to Watch Next
-![Perspectives](public/screenshots/perspectives.png)
-
-### Interactive Q&A Chat
-![Chat](public/screenshots/chat.png)
+> **See it live**: [news-intel-story-spark.lovable.app](https://news-intel-story-spark.lovable.app)
 
 ---
 
