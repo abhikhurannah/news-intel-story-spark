@@ -26,17 +26,23 @@ Guidelines:
 - Key Numbers: 3-5 important statistics/figures from the article
 - Bullish/Bearish: 3-4 points each
 - Watch Next: 4-5 forward-looking items
-- Be specific, cite facts from the article
-- If information is not available, make reasonable inferences but stay grounded`;
+- Use only facts stated in the article text. Do not infer, complete missing facts, or invent statistics.
+- If the article does not contain the requested information, use "Not stated in source".
+- Keep claims attributable to the supplied article; do not present model knowledge as article evidence.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { articleText, articleTitle, articleSource } = await req.json();
-    if (!articleText) {
+    if (typeof articleText !== "string" || articleText.trim().length === 0) {
       return new Response(JSON.stringify({ error: "articleText is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (articleText.length > 250_000) {
+      return new Response(JSON.stringify({ error: "articleText exceeds the allowed size" }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -90,6 +96,11 @@ serve(async (req) => {
 
     try {
       const briefing = JSON.parse(jsonStr.trim());
+      const requiredFields = ["title", "summary", "timeline", "entities", "keyNumbers", "bullish", "bearish", "watchNext", "whyItMatters"];
+      if (!requiredFields.every((field) => field in briefing)) throw new Error("Model response has an invalid briefing schema");
+      if (![briefing.timeline, briefing.entities, briefing.keyNumbers, briefing.bullish, briefing.bearish, briefing.watchNext].every(Array.isArray)) {
+        throw new Error("Model response has invalid briefing collections");
+      }
       // Add metadata
       briefing.source = articleSource || "Unknown";
       briefing.publishedAt = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });

@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import StoryCard from "@/components/StoryCard";
 import { trendingStories } from "@/lib/mockData";
 import { scrapeArticle, generateBriefing } from "@/lib/api";
+import { validateArticleUrl } from "@/lib/articleUrl";
 
 const Index = () => {
   const [url, setUrl] = useState("");
@@ -22,6 +23,11 @@ const Index = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
+    const validationError = validateArticleUrl(url);
+    if (validationError) {
+      toast({ title: "Invalid article URL", description: validationError, variant: "destructive" });
+      return;
+    }
     setIsAnalyzing(true);
 
     try {

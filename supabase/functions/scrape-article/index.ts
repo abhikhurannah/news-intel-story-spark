@@ -5,13 +5,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function validatePublicHttpUrl(value: unknown): string | null {
+  if (typeof value !== "string" || value.trim().length === 0) return "URL is required";
+  if (value.length > 2_048) return "URL is too long";
+  let parsed: URL;
+  try { parsed = new URL(value.trim()); } catch { return "A complete http or https URL is required"; }
+  if (!["http:", "https:"].includes(parsed.protocol)) return "Only http and https URLs are supported";
+  if (parsed.username || parsed.password) return "URLs containing credentials are not supported";
+  const host = parsed.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".local") || /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(host)) {
+    return "Local and private network URLs are not supported";
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { url } = await req.json();
-    if (!url) {
-      return new Response(JSON.stringify({ success: false, error: "URL is required" }), {
+    const validationError = validatePublicHttpUrl(url);
+    if (validationError) {
+      return new Response(JSON.stringify({ success: false, error: validationError }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -23,10 +38,7 @@ serve(async (req) => {
       });
     }
 
-    let formattedUrl = url.trim();
-    if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
-      formattedUrl = `https://${formattedUrl}`;
-    }
+    const formattedUrl = url.trim();
 
     console.log("Scraping URL:", formattedUrl);
 
@@ -52,7 +64,12 @@ serve(async (req) => {
       });
     }
 
-    const markdown = data.data?.markdown || data.markdown || "";
+    const markdown = (data.data?.markdown || data.markdown || "").slice(0, 200_000);
+    if (!markdown) {
+      return new Response(JSON.stringify({ success: false, error: "No readable article content was returned" }), {
+        status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const metadata = data.data?.metadata || data.metadata || {};
 
     return new Response(JSON.stringify({
